@@ -1,41 +1,31 @@
-
 /**
  * Module dependencies.
  */
-
-var express = require('express')
-  , routes = require('./routes');
-
-var app = module.exports = express.createServer();
+var express        = require('express');
+var app            = express();
+var server         = require('http').createServer(app);
+var io             = require('socket.io').listen(server);
+var routes         = require('./routes');
+var path           = require('path');
+var bodyParser     = require('body-parser');
+var methodOverride = require('method-override');
+var errorHandler   = require('errorhandler');
 
 // Configuration
+app.set('views', path.join(__dirname, "views"));
+app.set('view engine', 'pug');
+app.use(express.static(path.join(__dirname, "public")));
 
-app.configure(function(){
-  app.set('views', __dirname + '/views');
-  app.set('view engine', 'jade');
-  app.use(express.bodyParser());
-  app.use(express.methodOverride());
-  app.use(app.router);
-  app.use(express.static(__dirname + '/public'));
-});
-
-app.configure('development', function(){
-  app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
-});
-
-app.configure('production', function(){
+if(process.env.NODE_ENV === "production") {
   app.use(express.errorHandler());
-});
+}
+
+if(process.env.NODE_ENV === "development") {
+  app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
+}
 
 // Initialization
-
 var users = [];
-
-// Socket.IO
-
-var io = require('socket.io');
-var io = io.listen(app);
-io.set('log level', 1);
 
 io.sockets.on('connection', function(socket)
 {
@@ -109,7 +99,8 @@ io.sockets.on('connection', function(socket)
     // so lets flip all users turn and send back the assignments
     for(i=0; i<users.length; i++) {
       users[i].turn = (users[i].turn) ? false : true;
-      io.sockets.socket(users[i].id).emit('assignUser', users[i]);
+      // io.sockets.socket(users[i].id).emit('assignUser', users[i]);
+      io.sockets.connected[users[i].id].emit('assignUser', users[i]);
     }
 
     io.sockets.emit('drawXsAndOs', xBoard, oBoard);
@@ -120,5 +111,6 @@ io.sockets.on('connection', function(socket)
 
 app.get('/', routes.index);
 
-app.listen(3000);
-console.log("Express server listening on port %d in %s mode", app.address().port, app.settings.env);
+listener = server.listen(3000, function(){
+    console.log("Listening on port %d in %s environment.", listener.address().port, app.settings.env);
+});
